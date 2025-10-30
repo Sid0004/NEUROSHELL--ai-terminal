@@ -11,6 +11,8 @@
 #include <QTime>
 #include <QKeyEvent>
 #include <QSysInfo>
+#include <QFile>
+#include <QTextStream>
 
 TerminalWindow::TerminalWindow(QWidget *parent)
     : QWidget(parent), m_output(new QTextEdit(this)), m_input(new QLineEdit(this)) {
@@ -91,6 +93,7 @@ void TerminalWindow::printHelp() {
     appendOutput("  version   - Show app/Qt version");
     appendOutput("  history   - Show recent commands");
     appendOutput("  alias     - Create or show command aliases");
+    appendOutput("  save FILE - Save terminal output to file");
     appendOutput("  exit      - Quit NeuroShell");
 }
 
@@ -203,6 +206,26 @@ void TerminalWindow::runCommand(const QString &commandLine) {
         }
         return;
     }
+    if (cmd == "save") {
+        if (args.isEmpty()) {
+            appendOutput("Usage: save <filename>");
+            appendOutput("Example: save output.txt");
+        } else {
+            // Use the first argument as filename
+            const QString filename = args.section(' ', 0, 0);
+            QFile file(filename);
+            
+            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QTextStream stream(&file);
+                stream << m_output->toPlainText();
+                file.close();
+                appendOutput(QString("Successfully saved terminal output to: %1").arg(filename));
+            } else {
+                appendOutput(QString("Error: Failed to save to file '%1' - %2").arg(filename, file.errorString()));
+            }
+        }
+        return;
+    }
     if (cmd == "exit") {
         close();
         return;
@@ -262,7 +285,7 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
 
 void TerminalWindow::completeCommand() {
     const QString prefix = m_input->text().trimmed();
-    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","exit"};
+    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","exit"};
     
     // Also add user-defined aliases to completion list
     for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
