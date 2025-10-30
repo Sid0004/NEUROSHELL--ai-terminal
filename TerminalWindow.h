@@ -7,6 +7,7 @@
 class QTextEdit;
 class QLineEdit;
 class QLabel;
+class QCloseEvent;
 
 class TerminalWindow : public QWidget {
     Q_OBJECT
@@ -15,6 +16,7 @@ public:
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void handleReturnPressed();

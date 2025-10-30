@@ -13,6 +13,8 @@
 #include <QSysInfo>
 #include <QFile>
 #include <QTextStream>
+#include <QSettings>
+#include <QCloseEvent>
 
 TerminalWindow::TerminalWindow(QWidget *parent)
     : QWidget(parent), m_output(new QTextEdit(this)), m_input(new QLineEdit(this)) {
@@ -75,6 +77,10 @@ TerminalWindow::TerminalWindow(QWidget *parent)
     m_input->installEventFilter(this);
 
     connect(m_input, &QLineEdit::returnPressed, this, &TerminalWindow::handleReturnPressed);
+    
+    // Load command history from settings
+    QSettings settings("Sid0004", "NeuroShell");
+    m_history = settings.value("history").toStringList();
 }
 
 void TerminalWindow::appendOutput(const QString &text) {
@@ -315,6 +321,15 @@ void TerminalWindow::applyTheme(const QString &themeName) {
     setPalette(pal);
     
     m_currentTheme = themeName;
+}
+
+void TerminalWindow::closeEvent(QCloseEvent *event) {
+    // Save command history to settings
+    QSettings settings("Sid0004", "NeuroShell");
+    settings.setValue("history", m_history);
+    
+    // Accept the close event
+    QWidget::closeEvent(event);
 }
 
 bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
