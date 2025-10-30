@@ -11,6 +11,8 @@
 #include <QTime>
 #include <QKeyEvent>
 #include <QSysInfo>
+#include <QFile>
+#include <QTextStream>
 
 TerminalWindow::TerminalWindow(QWidget *parent)
     : QWidget(parent), m_output(new QTextEdit(this)), m_input(new QLineEdit(this)) {
@@ -90,6 +92,9 @@ void TerminalWindow::printHelp() {
     appendOutput("  whoami    - Show current user");
     appendOutput("  version   - Show app/Qt version");
     appendOutput("  history   - Show recent commands");
+    appendOutput("  alias     - Create or show command aliases");
+    appendOutput("  save FILE - Save terminal output to file");
+    appendOutput("  theme     - Change color theme (green, light, dark)");
     appendOutput("  exit      - Quit NeuroShell");
 }
 
@@ -117,8 +122,20 @@ void TerminalWindow::handleReturnPressed() {
 }
 
 void TerminalWindow::runCommand(const QString &commandLine) {
-    const QString cmd = commandLine.section(' ', 0, 0).toLower();
-    const QString args = commandLine.mid(cmd.size()).trimmed();
+    QString cmd = commandLine.section(' ', 0, 0).toLower();
+    QString args = commandLine.mid(cmd.size()).trimmed();
+    
+    // Check if command is an alias and expand it
+    if (m_aliases.contains(cmd)) {
+        const QString aliasCommand = m_aliases[cmd];
+        // If the alias has arguments and user provided arguments, append them
+        if (!args.isEmpty()) {
+            runCommand(aliasCommand + " " + args);
+        } else {
+            runCommand(aliasCommand);
+        }
+        return;
+    }
 
     if (cmd == "help") {
         printHelp();
@@ -155,6 +172,75 @@ void TerminalWindow::runCommand(const QString &commandLine) {
     if (cmd == "history") {
         for (int i = 0; i < m_history.size(); ++i) {
             appendOutput(QString::number(i + 1) + ": " + m_history.at(i));
+        }
+        return;
+    }
+    if (cmd == "alias") {
+        if (args.isEmpty()) {
+            // Show all existing aliases
+            if (m_aliases.isEmpty()) {
+                appendOutput("No aliases defined.");
+            } else {
+                appendOutput("Current aliases:");
+                for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
+                    appendOutput(QString("  %1=%2").arg(it.key(), it.value()));
+                }
+            }
+        } else if (args.contains('=')) {
+            // Create new alias: alias name=command
+            const int equalPos = args.indexOf('=');
+            const QString aliasName = args.left(equalPos).trimmed();
+            const QString aliasCommand = args.mid(equalPos + 1).trimmed();
+            
+            if (aliasName.isEmpty()) {
+                appendOutput("Error: alias name cannot be empty");
+            } else if (aliasCommand.isEmpty()) {
+                appendOutput("Error: alias command cannot be empty");
+            } else {
+                m_aliases[aliasName] = aliasCommand;
+                appendOutput(QString("Alias created: %1=%2").arg(aliasName, aliasCommand));
+            }
+        } else {
+            appendOutput("Usage: alias [name=command]");
+            appendOutput("  alias           - show all aliases");
+            appendOutput("  alias ls=clear  - create alias 'ls' for 'clear'");
+        }
+        return;
+    }
+    if (cmd == "save") {
+        if (args.isEmpty()) {
+            appendOutput("Usage: save <filename>");
+            appendOutput("Example: save output.txt");
+        } else {
+            // Use the first argument as filename
+            const QString filename = args.section(' ', 0, 0);
+            QFile file(filename);
+            
+            if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                QTextStream stream(&file);
+                stream << m_output->toPlainText();
+                file.close();
+                appendOutput(QString("Successfully saved terminal output to: %1").arg(filename));
+            } else {
+                appendOutput(QString("Error: Failed to save to file '%1' - %2").arg(filename, file.errorString()));
+            }
+        }
+        return;
+    }
+    if (cmd == "theme") {
+        if (args.isEmpty()) {
+            appendOutput(QString("Current theme: %1").arg(m_currentTheme));
+            appendOutput("Available themes: green, light, dark");
+            appendOutput("Usage: theme <name>");
+        } else {
+            const QString themeName = args.section(' ', 0, 0).toLower();
+            if (themeName == "green" || themeName == "light" || themeName == "dark") {
+                applyTheme(themeName);
+                appendOutput(QString("Theme changed to: %1").arg(themeName));
+            } else {
+                appendOutput(QString("Unknown theme: %1").arg(themeName));
+                appendOutput("Available themes: green, light, dark");
+            }
         }
         return;
     }
@@ -196,6 +282,41 @@ void TerminalWindow::historyNext() {
     }
 }
 
+void TerminalWindow::applyTheme(const QString &themeName) {
+    QPalette pal;
+    
+    if (themeName == "green") {
+        // Green on black theme (default)
+        pal.setColor(QPalette::Base, QColor(0, 0, 0));
+        pal.setColor(QPalette::Text, QColor(0, 255, 0));
+        pal.setColor(QPalette::Window, QColor(0, 0, 0));
+        pal.setColor(QPalette::WindowText, QColor(0, 255, 0));
+        pal.setColor(QPalette::PlaceholderText, QColor(0, 180, 0));
+    } else if (themeName == "light") {
+        // Black on white theme
+        pal.setColor(QPalette::Base, QColor(255, 255, 255));
+        pal.setColor(QPalette::Text, QColor(0, 0, 0));
+        pal.setColor(QPalette::Window, QColor(255, 255, 255));
+        pal.setColor(QPalette::WindowText, QColor(0, 0, 0));
+        pal.setColor(QPalette::PlaceholderText, QColor(128, 128, 128));
+    } else if (themeName == "dark") {
+        // Light on dark theme
+        pal.setColor(QPalette::Base, QColor(32, 32, 32));
+        pal.setColor(QPalette::Text, QColor(220, 220, 220));
+        pal.setColor(QPalette::Window, QColor(32, 32, 32));
+        pal.setColor(QPalette::WindowText, QColor(220, 220, 220));
+        pal.setColor(QPalette::PlaceholderText, QColor(160, 160, 160));
+    }
+    
+    // Apply palette to all components
+    m_output->setPalette(pal);
+    m_input->setPalette(pal);
+    m_prompt->setPalette(pal);
+    setPalette(pal);
+    
+    m_currentTheme = themeName;
+}
+
 bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
     if (watched == m_input && event->type() == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
@@ -217,7 +338,13 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
 
 void TerminalWindow::completeCommand() {
     const QString prefix = m_input->text().trimmed();
-    const QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","exit"};
+    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","theme","exit"};
+    
+    // Also add user-defined aliases to completion list
+    for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
+        cmds.append(it.key());
+    }
+    
     for (const QString &c : cmds) {
         if (c.startsWith(prefix, Qt::CaseInsensitive)) {
             // If the user has typed something, add a space after the completed command
