@@ -90,6 +90,7 @@ void TerminalWindow::printHelp() {
     appendOutput("  whoami    - Show current user");
     appendOutput("  version   - Show app/Qt version");
     appendOutput("  history   - Show recent commands");
+    appendOutput("  alias     - Create or show command aliases");
     appendOutput("  exit      - Quit NeuroShell");
 }
 
@@ -117,8 +118,20 @@ void TerminalWindow::handleReturnPressed() {
 }
 
 void TerminalWindow::runCommand(const QString &commandLine) {
-    const QString cmd = commandLine.section(' ', 0, 0).toLower();
-    const QString args = commandLine.mid(cmd.size()).trimmed();
+    QString cmd = commandLine.section(' ', 0, 0).toLower();
+    QString args = commandLine.mid(cmd.size()).trimmed();
+    
+    // Check if command is an alias and expand it
+    if (m_aliases.contains(cmd)) {
+        const QString aliasCommand = m_aliases[cmd];
+        // If the alias has arguments and user provided arguments, append them
+        if (!args.isEmpty()) {
+            runCommand(aliasCommand + " " + args);
+        } else {
+            runCommand(aliasCommand);
+        }
+        return;
+    }
 
     if (cmd == "help") {
         printHelp();
@@ -155,6 +168,38 @@ void TerminalWindow::runCommand(const QString &commandLine) {
     if (cmd == "history") {
         for (int i = 0; i < m_history.size(); ++i) {
             appendOutput(QString::number(i + 1) + ": " + m_history.at(i));
+        }
+        return;
+    }
+    if (cmd == "alias") {
+        if (args.isEmpty()) {
+            // Show all existing aliases
+            if (m_aliases.isEmpty()) {
+                appendOutput("No aliases defined.");
+            } else {
+                appendOutput("Current aliases:");
+                for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
+                    appendOutput(QString("  %1=%2").arg(it.key(), it.value()));
+                }
+            }
+        } else if (args.contains('=')) {
+            // Create new alias: alias name=command
+            const int equalPos = args.indexOf('=');
+            const QString aliasName = args.left(equalPos).trimmed();
+            const QString aliasCommand = args.mid(equalPos + 1).trimmed();
+            
+            if (aliasName.isEmpty()) {
+                appendOutput("Error: alias name cannot be empty");
+            } else if (aliasCommand.isEmpty()) {
+                appendOutput("Error: alias command cannot be empty");
+            } else {
+                m_aliases[aliasName] = aliasCommand;
+                appendOutput(QString("Alias created: %1=%2").arg(aliasName, aliasCommand));
+            }
+        } else {
+            appendOutput("Usage: alias [name=command]");
+            appendOutput("  alias           - show all aliases");
+            appendOutput("  alias ls=clear  - create alias 'ls' for 'clear'");
         }
         return;
     }
@@ -217,7 +262,13 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
 
 void TerminalWindow::completeCommand() {
     const QString prefix = m_input->text().trimmed();
-    const QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","exit"};
+    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","exit"};
+    
+    // Also add user-defined aliases to completion list
+    for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
+        cmds.append(it.key());
+    }
+    
     for (const QString &c : cmds) {
         if (c.startsWith(prefix, Qt::CaseInsensitive)) {
             // If the user has typed something, add a space after the completed command

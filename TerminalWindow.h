@@ -2,6 +2,7 @@
 
 #include <QWidget>
 #include <QStringList>
+#include <QMap>
 
 class QTextEdit;
 class QLineEdit;
@@ -37,6 +38,7 @@ private:
     QLabel *m_prompt;
     QStringList m_history;
     int m_historyIndex = -1; // -1 means not currently navigating
+    QMap<QString, QString> m_aliases; // alias name -> command mapping
 };
 
 
