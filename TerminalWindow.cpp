@@ -207,8 +207,26 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
             historyNext();
             return true;
         }
+        if (keyEvent->key() == Qt::Key_Tab) {
+            completeCommand();
+            return true;
+        }
     }
     return QWidget::eventFilter(watched, event);
+}
+
+void TerminalWindow::completeCommand() {
+    const QString prefix = m_input->text().trimmed();
+    const QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","exit"};
+    for (const QString &c : cmds) {
+        if (c.startsWith(prefix, Qt::CaseInsensitive)) {
+            // If the user has typed something, add a space after the completed command
+            m_input->setText(c + (prefix.isEmpty() ? "" : " "));
+            // place cursor at end
+            m_input->setCursorPosition(m_input->text().length());
+            break;
+        }
+    }
 }
 
 
