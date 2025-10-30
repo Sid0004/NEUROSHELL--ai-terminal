@@ -29,6 +29,8 @@ private:
     void historyAdd(const QString &cmd);
     void historyPrev();
     void historyNext();
+    // Autocomplete the current input when Tab is pressed
+    void completeCommand();
 
     QTextEdit *m_output;
     QLineEdit *m_input;
