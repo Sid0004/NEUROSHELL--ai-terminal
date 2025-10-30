@@ -1,4 +1,5 @@
 #include "TerminalWindow.h"
+#include "AIService.h"
 
 #include <QTextEdit>
 #include <QLineEdit>
@@ -81,6 +82,9 @@ TerminalWindow::TerminalWindow(QWidget *parent)
     // Load command history from settings
     QSettings settings("Sid0004", "NeuroShell");
     m_history = settings.value("history").toStringList();
+    
+    // Initialize AI service
+    initializeAI();
 }
 
 void TerminalWindow::appendOutput(const QString &text) {
@@ -101,6 +105,8 @@ void TerminalWindow::printHelp() {
     appendOutput("  alias     - Create or show command aliases");
     appendOutput("  save FILE - Save terminal output to file");
     appendOutput("  theme     - Change color theme (green, light, dark)");
+    appendOutput("  ai MSG    - Send message to AI chatbot");
+    appendOutput("  chat MSG  - Same as 'ai' command");
     appendOutput("  exit      - Quit NeuroShell");
 }
 
@@ -233,6 +239,46 @@ void TerminalWindow::runCommand(const QString &commandLine) {
         }
         return;
     }
+    if (cmd == "ai" || cmd == "chat") {
+        if (!m_aiService) {
+            appendOutput("AI service is not available");
+            return;
+        }
+        
+        if (args.isEmpty()) {
+            appendOutput("AI Chat Mode - Usage:");
+            appendOutput("  ai <message>     - Send message to AI");
+            appendOutput("  chat <message>   - Same as 'ai'");
+            appendOutput("  ai status        - Show AI service status");
+            appendOutput("  ai clear         - Clear conversation context");
+            appendOutput("");
+            appendOutput("Examples:");
+            appendOutput("  ai hello");
+            appendOutput("  chat what can you do?");
+            appendOutput("  ai help me with coding");
+        } else if (args.toLower() == "status") {
+            appendOutput("AI Service Status:");
+            appendOutput(QString("  Provider: %1").arg(AIServiceFactory::getProviderName(m_aiService->getProvider())));
+            appendOutput(QString("  Model: %1").arg(m_aiService->getModelName()));
+            appendOutput(QString("  Connected: %1").arg(m_aiService->isConnected() ? "Yes" : "No"));
+            appendOutput(QString("  Configured: %1").arg(m_aiService->isConfigured() ? "Yes" : "No"));
+            appendOutput(QString("  Usage Count: %1").arg(m_aiService->getUsageCount()));
+        } else if (args.toLower() == "clear") {
+            if (m_aiService) {
+                m_aiService->clearContext();
+                appendOutput("AI conversation context cleared");
+            }
+        } else {
+            // Send message to AI
+            appendOutput(QString("Sending to AI: %1").arg(args));
+            appendOutput("Waiting for response...");
+            
+            if (m_aiService) {
+                m_aiService->sendMessage(args);
+            }
+        }
+        return;
+    }
     if (cmd == "theme") {
         if (args.isEmpty()) {
             appendOutput(QString("Current theme: %1").arg(m_currentTheme));
@@ -323,6 +369,49 @@ void TerminalWindow::applyTheme(const QString &themeName) {
     m_currentTheme = themeName;
 }
 
+void TerminalWindow::initializeAI() {
+    // Create mock AI service for development
+    m_aiService = AIServiceFactory::createService(AIService::AIProvider::Mock, this);
+    
+    if (m_aiService) {
+        // Connect AI signals to handlers
+        connect(m_aiService, &AIService::responseReceived, this, 
+                [this](const AIService::AIResponse &response) {
+            if (response.status == AIService::ResponseStatus::Success) {
+                handleAIResponse(response.content);
+            } else {
+                handleAIError(response.errorMessage);
+            }
+        });
+        
+        connect(m_aiService, &AIService::errorOccurred, this, &TerminalWindow::handleAIError);
+        
+        appendOutput("AI Service initialized (Mock mode for development)");
+    } else {
+        appendOutput("Warning: Failed to initialize AI service");
+    }
+}
+
+void TerminalWindow::handleAIResponse(const QString &response) {
+    appendOutput("AI Response:");
+    appendOutput("─────────────");
+    
+    // Split response into lines and format nicely
+    QStringList lines = response.split('\n');
+    for (const QString &line : lines) {
+        if (!line.trimmed().isEmpty()) {
+            appendOutput("  " + line);
+        } else {
+            appendOutput("");
+        }
+    }
+    appendOutput("─────────────");
+}
+
+void TerminalWindow::handleAIError(const QString &error) {
+    appendOutput(QString("AI Error: %1").arg(error));
+}
+
 void TerminalWindow::closeEvent(QCloseEvent *event) {
     // Save command history to settings
     QSettings settings("Sid0004", "NeuroShell");
@@ -353,7 +442,7 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
 
 void TerminalWindow::completeCommand() {
     const QString prefix = m_input->text().trimmed();
-    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","theme","exit"};
+    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","theme","ai","chat","exit"};
     
     // Also add user-defined aliases to completion list
     for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
