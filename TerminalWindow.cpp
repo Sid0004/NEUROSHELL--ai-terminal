@@ -94,6 +94,7 @@ void TerminalWindow::printHelp() {
     appendOutput("  history   - Show recent commands");
     appendOutput("  alias     - Create or show command aliases");
     appendOutput("  save FILE - Save terminal output to file");
+    appendOutput("  theme     - Change color theme (green, light, dark)");
     appendOutput("  exit      - Quit NeuroShell");
 }
 
@@ -226,6 +227,23 @@ void TerminalWindow::runCommand(const QString &commandLine) {
         }
         return;
     }
+    if (cmd == "theme") {
+        if (args.isEmpty()) {
+            appendOutput(QString("Current theme: %1").arg(m_currentTheme));
+            appendOutput("Available themes: green, light, dark");
+            appendOutput("Usage: theme <name>");
+        } else {
+            const QString themeName = args.section(' ', 0, 0).toLower();
+            if (themeName == "green" || themeName == "light" || themeName == "dark") {
+                applyTheme(themeName);
+                appendOutput(QString("Theme changed to: %1").arg(themeName));
+            } else {
+                appendOutput(QString("Unknown theme: %1").arg(themeName));
+                appendOutput("Available themes: green, light, dark");
+            }
+        }
+        return;
+    }
     if (cmd == "exit") {
         close();
         return;
@@ -264,6 +282,41 @@ void TerminalWindow::historyNext() {
     }
 }
 
+void TerminalWindow::applyTheme(const QString &themeName) {
+    QPalette pal;
+    
+    if (themeName == "green") {
+        // Green on black theme (default)
+        pal.setColor(QPalette::Base, QColor(0, 0, 0));
+        pal.setColor(QPalette::Text, QColor(0, 255, 0));
+        pal.setColor(QPalette::Window, QColor(0, 0, 0));
+        pal.setColor(QPalette::WindowText, QColor(0, 255, 0));
+        pal.setColor(QPalette::PlaceholderText, QColor(0, 180, 0));
+    } else if (themeName == "light") {
+        // Black on white theme
+        pal.setColor(QPalette::Base, QColor(255, 255, 255));
+        pal.setColor(QPalette::Text, QColor(0, 0, 0));
+        pal.setColor(QPalette::Window, QColor(255, 255, 255));
+        pal.setColor(QPalette::WindowText, QColor(0, 0, 0));
+        pal.setColor(QPalette::PlaceholderText, QColor(128, 128, 128));
+    } else if (themeName == "dark") {
+        // Light on dark theme
+        pal.setColor(QPalette::Base, QColor(32, 32, 32));
+        pal.setColor(QPalette::Text, QColor(220, 220, 220));
+        pal.setColor(QPalette::Window, QColor(32, 32, 32));
+        pal.setColor(QPalette::WindowText, QColor(220, 220, 220));
+        pal.setColor(QPalette::PlaceholderText, QColor(160, 160, 160));
+    }
+    
+    // Apply palette to all components
+    m_output->setPalette(pal);
+    m_input->setPalette(pal);
+    m_prompt->setPalette(pal);
+    setPalette(pal);
+    
+    m_currentTheme = themeName;
+}
+
 bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
     if (watched == m_input && event->type() == QEvent::KeyPress) {
         auto *keyEvent = static_cast<QKeyEvent *>(event);
@@ -285,7 +338,7 @@ bool TerminalWindow::eventFilter(QObject *watched, QEvent *event) {
 
 void TerminalWindow::completeCommand() {
     const QString prefix = m_input->text().trimmed();
-    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","exit"};
+    QStringList cmds = {"help","clear","cls","aboutme","echo","date","time","whoami","version","history","alias","save","theme","exit"};
     
     // Also add user-defined aliases to completion list
     for (auto it = m_aliases.constBegin(); it != m_aliases.constEnd(); ++it) {
