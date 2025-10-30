@@ -8,6 +8,7 @@ class QTextEdit;
 class QLineEdit;
 class QLabel;
 class QCloseEvent;
+class AIService;
 
 class TerminalWindow : public QWidget {
     Q_OBJECT
@@ -36,6 +37,10 @@ private:
     void completeCommand();
     // Theme management
     void applyTheme(const QString &themeName);
+    // AI integration
+    void initializeAI();
+    void handleAIResponse(const QString &response);
+    void handleAIError(const QString &error);
 
     QTextEdit *m_output;
     QLineEdit *m_input;
@@ -44,6 +49,7 @@ private:
     int m_historyIndex = -1; // -1 means not currently navigating
     QMap<QString, QString> m_aliases; // alias name -> command mapping
     QString m_currentTheme = "green"; // current color theme
+    AIService *m_aiService = nullptr; // AI chatbot service
 };
 
 

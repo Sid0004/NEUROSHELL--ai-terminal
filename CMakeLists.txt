@@ -14,6 +14,8 @@ set(SOURCES
         main.cpp
         TerminalWindow.cpp
         TerminalWindow.h
+        AIService.cpp
+        AIService.h
 )
 
 qt_add_executable(NEUROSHELL
